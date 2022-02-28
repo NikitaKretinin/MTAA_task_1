@@ -67,6 +67,13 @@ recordroute = ""
 topvia = ""
 registrar = {}
 
+
+def extract_user(request_str):
+    final = request_str.split("<")[1]
+    final = final.split(":")[1]
+    final = final.split(">")[0]
+    return final
+
 def hexdump( chars, sep, width ):
     while chars:
         line = chars[:width]
@@ -243,8 +250,9 @@ class UDPHandler(socketserver.BaseRequestHandler):
         if expires == 0:
             if fromm in registrar:
                 del registrar[fromm]
-                logging.info("\n\n")
                 logging.info(">>> User " + fromm + " Registered <<<")
+                user_ip = self.data[1].split(" ")[2].split(";")[0]
+                logging.info("User IP: " + user_ip + "\n")
                 self.sendResponse("200 VYBAVENE OK")
                 return
         else:
@@ -254,8 +262,9 @@ class UDPHandler(socketserver.BaseRequestHandler):
 
         registrar[fromm]=[contact,self.socket,self.client_address,validity]
         self.debugRegister()
-        logging.info("\n\n")
         logging.info(">>> User " + fromm + " Registered <<<")
+        user_ip = self.data[1].split(" ")[2].split(";")[0]
+        logging.info("User IP: " + user_ip + "\n")
         self.sendResponse("200 VYBAVENE OK")
 
     def processInvite(self):
@@ -307,6 +316,14 @@ class UDPHandler(socketserver.BaseRequestHandler):
                 #insert Record-Route
                 data.insert(1,recordroute)
                 text = "\r\n".join(data)
+
+                if data[0].find("CANCEL") != -1:
+                    print(">>> Call terminated <<<")
+                    logging.info(">>> Call terminated <<<")
+                    logging.info(data[4])
+                    logging.info("Started by " + extract_user(data[5]))
+                    logging.info("Destination: " + data[6].split(":")[2] + "\n")
+
                 socket.sendto(text.encode("utf-8"), claddr)
                 showtime()
             else:
@@ -315,12 +332,6 @@ class UDPHandler(socketserver.BaseRequestHandler):
             self.sendResponse("500 Vnutorna Chyba Servera")
 
     def processCode(self):
-
-        def extract_user(request_str):
-            final = request_str.split("<")[1]
-            final = final.split(":")[1]
-            final = final.split(">")[0]
-            return final
 
         origin = self.getOrigin()
         if len(origin) > 0:
@@ -334,20 +345,20 @@ class UDPHandler(socketserver.BaseRequestHandler):
                 if data[0].find("Ok") != -1:
                     if data[5].find("INVITE") != -1:
                         print(">>> Call started by " + extract_user(data[2]) + " <<<")
-                        logging.info("\n\n")
                         logging.info(">>> Call accepted <<<")
+                        logging.info(data[4])
                         logging.info("Started by " + extract_user(data[2]))
-                        logging.info("Accepted by " + extract_user(data[3]))
+                        logging.info("Accepted by " + extract_user(data[3]) + "\n")
                     elif data[5].find("BYE") != -1:
                         print(">>> Call ended <<<")
-                        logging.info("\n\n")
                         logging.info(">>> Call ended by " + extract_user(data[2]) + " <<<")
+                        logging.info(data[4] + "\n")
                 elif data[0].find("Decline") != -1 and data[5].find("INVITE") != -1:
                     print(">>> Call declined <<<")
-                    logging.info("\n\n")
                     logging.info(">>> Call declined <<<")
+                    logging.info(data[4])
                     logging.info("Started by " + extract_user(data[2]))
-                    logging.info("Declined by " + extract_user(data[3]))
+                    logging.info("Declined by " + extract_user(data[3]) + "\n")
 
                 text = text.replace("Ringing", "Volam...", 1)
                 text = text.replace("Trying", "Skusam...", 1)
